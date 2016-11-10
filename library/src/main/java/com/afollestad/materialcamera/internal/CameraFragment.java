@@ -30,6 +30,8 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 
+import static android.hardware.Camera.Parameters.PREVIEW_FPS_MAX_INDEX;
+import static android.hardware.Camera.Parameters.PREVIEW_FPS_MIN_INDEX;
 import static com.afollestad.materialcamera.internal.BaseCaptureActivity.CAMERA_POSITION_BACK;
 import static com.afollestad.materialcamera.internal.BaseCaptureActivity.CAMERA_POSITION_FRONT;
 import static com.afollestad.materialcamera.internal.BaseCaptureActivity.CAMERA_POSITION_UNKNOWN;
@@ -53,6 +55,7 @@ public class CameraFragment extends BaseCameraFragment implements View.OnClickLi
     private int mDisplayOrientation;
     private boolean mIsAutoFocusing;
     List<Integer> mFlashModes;
+    private int[] mFpsRange = {0, 0};
 
     public static CameraFragment newInstance() {
         CameraFragment fragment = new CameraFragment();
@@ -73,6 +76,12 @@ public class CameraFragment extends BaseCameraFragment implements View.OnClickLi
         if (backupSize != null) return backupSize;
         LOG(CameraFragment.class, "Couldn't find any suitable video size");
         return choices.get(choices.size() - 1);
+    }
+
+    private static double chooseFrameRate(double preferredFrameRate, int[] range) {
+        double min = range[PREVIEW_FPS_MIN_INDEX] / 1000D;
+        double max = range[PREVIEW_FPS_MAX_INDEX] / 1000D;
+        return Math.max(Math.min(max, preferredFrameRate), min);
     }
 
     private static Camera.Size chooseOptimalSize(List<Camera.Size> choices, int width, int height, Camera.Size aspectRatio) {
@@ -237,7 +246,7 @@ public class CameraFragment extends BaseCameraFragment implements View.OnClickLi
 
             setCameraDisplayOrientation(parameters);
             mCamera.setParameters(parameters);
-
+            parameters.getPreviewFpsRange(mFpsRange);
             // NOTE: onFlashModesLoaded should not be called while modifying camera parameters as
             //       the flash parameters set in setupFlashMode will then be overwritten
             mFlashModes = CameraUtil.getSupportedFlashModes(this.getActivity(), parameters);
@@ -352,7 +361,8 @@ public class CameraFragment extends BaseCameraFragment implements View.OnClickLi
 
             final CamcorderProfile profile = CamcorderProfile.get(getCurrentCameraId(), mInterface.qualityProfile());
             mMediaRecorder.setOutputFormat(profile.fileFormat);
-            mMediaRecorder.setVideoFrameRate(mInterface.videoFrameRate(profile.videoFrameRate));
+            double frameRate = chooseFrameRate(mInterface.videoFrameRate(profile.videoFrameRate), mFpsRange);
+//            mMediaRecorder.setVideoFrameRate((int) frameRate);
             mMediaRecorder.setVideoSize(mVideoSize.width, mVideoSize.height);
             mMediaRecorder.setVideoEncodingBitRate(mInterface.videoEncodingBitRate(profile.videoBitRate));
             mMediaRecorder.setVideoEncoder(profile.videoCodec);
